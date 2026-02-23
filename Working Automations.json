@@ -1,0 +1,1038 @@
+{
+  "name": "Working Automations",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-malware",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1408,
+        -256
+      ],
+      "id": "593b64be-2ed7-455a-bc11-5004a9aae025",
+      "name": "Webhook",
+      "webhookId": "2dbf7d59-b504-4620-90a5-f808e3aba393"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9833ab54-5be6-48e7-8309-65feacaafa4d",
+              "name": "agent",
+              "value": "={{ $json.body.agent.name }}",
+              "type": "string"
+            },
+            {
+              "id": "56758c8f-aac8-483e-a74a-0be583c4c522",
+              "name": "file",
+              "value": "={{ $json.body.syscheck.path }}",
+              "type": "string"
+            },
+            {
+              "id": "5b0943a7-3fcd-452d-9278-a15d541c1468",
+              "name": "hash",
+              "value": "={{ $json.body.syscheck.sha256 }}",
+              "type": "string"
+            },
+            {
+              "id": "ef4a6788-9ce1-432d-9228-2d893de9e462",
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "bac46411-446e-4032-8396-2660ff352c65",
+              "name": "rule",
+              "value": "={{ $json.body.rule.description }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1200,
+        -256
+      ],
+      "id": "c55de766-8f80-4c6a-9c79-e756ec207336",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/files/{{ $('Webhook').first().json.body.syscheck.sha256_after }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpMultipleHeadersAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1008,
+        -400
+      ],
+      "id": "3117edb5-4103-4119-994b-4916ea7b6b42",
+      "name": "Virustotal",
+      "notesInFlow": true,
+      "credentials": {
+        "httpMultipleHeadersAuth": {
+          "id": "FrBB09CoxrchkMct",
+          "name": "Multiple Headers Auth account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://otx.alienvault.com/api/v1/indicators/file/{{ $('Webhook').first().json.body.syscheck.sha256_after }}/general",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpMultipleHeadersAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1008,
+        -160
+      ],
+      "id": "9d5eb9e0-6371-4872-ba0f-bdbd6b32e75a",
+      "name": "Alienvault",
+      "notesInFlow": true,
+      "credentials": {
+        "httpMultipleHeadersAuth": {
+          "id": "tqUolvCt7eIBshzr",
+          "name": "Multiple Headers Auth account 3"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -800,
+        -272
+      ],
+      "id": "114eb5ff-4067-4c07-b82a-e638a1fadd41",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Memanggil data dari node sesuai dengan nama baru yang Anda buat\nconst vtNode = $('Virustotal').first().json || {};\nconst otxNode = $('Alienvault').first().json || {};\n\n// Pastikan node ke-2 Anda (langkah ekstrak IOC) bernama \"Edit Fields\". \n// Jika namanya \"Set\" atau \"Edit Fields1\", ubah nama di bawah ini:\nconst editNode = $('Edit Fields').first().json || {};\n\n// Ambil atribut VT dengan aman\nconst vtData = vtNode.data ? vtNode.data.attributes : {};\n\n// Batasi known_names maksimal 5\nlet names = vtData.names || [];\nlet limitedNames = names.slice(0, 5);\n\n// Susun hasil akhir yang rapi\nreturn {\n  hash: vtData.sha256 || editNode.hash || \"Tidak ada hash\",\n  file_info: vtData.meaningful_name || limitedNames[0] || \"Unknown File\",\n  reputation: vtData.reputation || 0,\n  detection_stats: vtData.last_analysis_stats || {}, \n  tags: vtData.tags || [],\n  packers: vtData.packers || \"Tidak ada info\",\n  known_names: limitedNames,\n  otx_pulse_count: otxNode.pulse_info ? otxNode.pulse_info.count : 0 \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        -272
+      ],
+      "id": "7f812612-35e4-499c-938b-82765d0899ef",
+      "name": "Clean the Alert"
+    },
+    {
+      "parameters": {
+        "text": "=Anda adalah seorang Analis SOC Senior (Tier 3). Tugas Anda adalah menganalisis indikator kompromi (IOC) dari Wazuh SIEM. WAJIB: Berikan semua jawaban dalam Bahasa Indonesia yang formal dan teknis. \n\nBerikut adalah data gabungan dari berbagai sumber keamanan untuk Anda analisis:\n\n=== DATA WAZUH ALERT ===\n{{ JSON.stringify($('Webhook').first().json) }}\n\n=== DATA VIRUSTOTAL ===\n{{ JSON.stringify($('Virustotal').first().json) }}\n\n=== DATA ALIENVAULT OTX ===\n{{ JSON.stringify($('Alienvault').first().json) }}\n\nBerdasarkan ketiga data di atas, apakah ini ancaman nyata? Jika ya, set 'should_create_case' ke true.",
+        "schemaType": "manual",
+        "inputSchema": "={\n  \"type\": \"object\",\n  \"properties\": {\n    \"summary\": { \"type\": \"string\" },\n    \"technical_details\": { \"type\": \"string\" },\n    \"risk_score\": { \"type\": \"number\" },\n    \"risk_level\": { \"type\": \"string\", \"enum\": [\"Low\", \"Medium\", \"High\", \"Critical\"] },\n    \"confidence\": { \"type\": \"string\", \"enum\": [\"Low\", \"Medium\", \"High\"] },\n    \"mitre_techniques\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"technique\": { \"type\": \"string\" },\n          \"technique_id\": { \"type\": \"string\" },\n          \"tactic\": { \"type\": \"string\" },\n          \"justification\": { \"type\": \"string\" }\n        }\n      }\n    },\n    \"key_indicators\": {\n      \"type\": \"array\",\n      \"items\": { \"type\": \"string\" }\n    },\n    \"recommended_investigation_steps\": {\n      \"type\": \"array\",\n      \"items\": { \"type\": \"string\" }\n    },\n    \"recommended_response_actions\": {\n      \"type\": \"array\",\n      \"items\": { \"type\": \"string\" }\n    },\n    \"automation_recommendation\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"should_escalate\": { \"type\": \"boolean\" },\n        \"should_create_case\": { \"type\": \"boolean\" },\n        \"should_isolate_host\": { \"type\": \"boolean\" },\n        \"should_notify_soc\": { \"type\": \"boolean\" }\n      }\n    },\n    \"final_decision\": { \"type\": \"string\", \"enum\": [\"Escalate\", \"Investigate Further\", \"Close as Benign\"] }\n  }\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        -272
+      ],
+      "id": "66d4fe90-74dd-4b9d-96cc-3548a8cfcec2",
+      "name": "Information Extractor"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -80
+      ],
+      "id": "6b75ad1b-3917-42eb-a0f6-b4da3d7b3165",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YMP3YYDKXCWq0qgI",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ebbbed1a-a71e-47ec-b963-282b929e88b2",
+              "leftValue": "={{ $json.output.automation_recommendation.should_create_case }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -48,
+        -272
+      ],
+      "id": "3b729212-3fb8-4d9f-bc01-82482fc4a0ad",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "case",
+        "caseFields": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "=[AI-SOC] Analisis Insiden - Score: {{ $json.output.risk_score }}",
+            "severity": "={{ $('Information Extractor').first().json.output.risk_score >= 80 ? 4 : 3 }}",
+            "description": "=### 🔍 Detail Teknis\n{{ $json.output.technical_details }}",
+            "tags": "={{ $json.output.risk_level }}",
+            "summary": "={{ $json.output.summary }}",
+            "status": "New"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "displayName": "Title",
+              "id": "title",
+              "type": "string",
+              "removed": false,
+              "required": true,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Description",
+              "id": "description",
+              "type": "string",
+              "removed": false,
+              "required": true,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Severity (Severity of information)",
+              "id": "severity",
+              "type": "options",
+              "options": [
+                {
+                  "name": "Low",
+                  "value": 1
+                },
+                {
+                  "name": "Medium",
+                  "value": 2
+                },
+                {
+                  "name": "High",
+                  "value": 3
+                },
+                {
+                  "name": "Critical",
+                  "value": 4
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Start Date",
+              "id": "startDate",
+              "type": "dateTime",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "End Date",
+              "id": "endDate",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Tags",
+              "id": "tags",
+              "type": "string",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Flag",
+              "id": "flag",
+              "type": "boolean",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "TLP (Confidentiality of information)",
+              "id": "tlp",
+              "type": "options",
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "PAP (Level of exposure of information)",
+              "id": "pap",
+              "type": "options",
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Summary",
+              "id": "summary",
+              "type": "string",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Status",
+              "id": "status",
+              "type": "options",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "options": [
+                {
+                  "name": "Duplicated",
+                  "value": "Duplicated",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "FalsePositive",
+                  "value": "FalsePositive",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "Indeterminate",
+                  "value": "Indeterminate",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "InProgress",
+                  "value": "InProgress",
+                  "description": "Stage: InProgress"
+                },
+                {
+                  "name": "New",
+                  "value": "New",
+                  "description": "Stage: New"
+                },
+                {
+                  "name": "Other",
+                  "value": "Other",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "TruePositive",
+                  "value": "TruePositive",
+                  "description": "Stage: Closed"
+                }
+              ]
+            },
+            {
+              "displayName": "Assignee",
+              "id": "assignee",
+              "type": "options",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "options": [
+                {
+                  "name": "n8n",
+                  "value": "n8n_soar@thehive.local"
+                }
+              ]
+            },
+            {
+              "displayName": "Case Template",
+              "id": "caseTemplate",
+              "type": "options",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "options": []
+            },
+            {
+              "displayName": "Tasks",
+              "id": "tasks",
+              "type": "array",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Sharing Parameters",
+              "id": "sharingParameters",
+              "type": "array",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Observable Rule",
+              "id": "observableRule",
+              "type": "string",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "n8n-nodes-base.theHiveProject",
+      "typeVersion": 1,
+      "position": [
+        208,
+        -288
+      ],
+      "id": "d7c8ce9d-ebc9-4783-a692-fa8002dcaabf",
+      "name": "Create a case",
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "dXkqVqDrBDnqcQub",
+          "name": "The Hive 5 account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8029015272",
+        "text": "=<b>🚨 NOTIFIKASI INSIDEN AI-SOC 🚨</b>\n\n<b>📌 Ringkasan:</b>\n{{ $('Information Extractor').first().json.output.summary }}\n\n<b>📊 Analisis Risiko:</b>\n- <b>Skor Risiko:</b> {{ $('Information Extractor').first().json.output.risk_score }}/100\n- <b>Level Risiko:</b> {{ $('Information Extractor').first().json.output.risk_level }}\n- <b>Tingkat Kepercayaan AI:</b> {{ $('Information Extractor').first().json.output.confidence }}\n\n<b>🧠 Keputusan Akhir:</b>\n<u><b>{{ $('Information Extractor').first().json.output.final_decision }}</b></u>\n\n<b>🔍 Indikator Kunci:</b>\n{{ $('Information Extractor').first().json.output.key_indicators.join(', ') }}\n\n<b>🛠️ Langkah Investigasi yang Disarankan:</b>\n{{ $('Information Extractor').first().json.output.recommended_investigation_steps.join('\\n- ') }}\n\n<b>✅ Tindakan Respons yang Disarankan:</b>\n{{ $('Information Extractor').first().json.output.recommended_response_actions.join('\\n- ') }}\n\n<i>Pesan ini dikirim secara otomatis. Tiket investigasi telah dibuat di dashboard TheHive.</i>",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        704,
+        -288
+      ],
+      "id": "cc245c8e-a1d0-41c0-9f94-8370e8fbddda",
+      "name": "Send a text message",
+      "webhookId": "2740d4a0-fa47-4841-9967-7ae809afdf18",
+      "credentials": {
+        "telegramApi": {
+          "id": "uJt6CKFG0FGFfuqW",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8029015272",
+        "text": "=✅ <b>AUTO-CLOSED (Benign)</b> <b>AI menyimpulkan peringatan ini aman.</b> <b>Alasan:</b> {{ $('Information Extractor').first().json.output.summary }} <i>Tidak ada tiket TheHive yang dibuat.</i>",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        -64
+      ],
+      "id": "4a6fa04a-2b39-485b-af59-a82dbbb21d72",
+      "name": "Send a text message1",
+      "webhookId": "20dc3a0d-29cc-41aa-81e3-804f2e9e43b3",
+      "credentials": {
+        "telegramApi": {
+          "id": "uJt6CKFG0FGFfuqW",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "comment",
+        "addTo": "case",
+        "id": {
+          "__rl": true,
+          "value": "={{ $json._id }}",
+          "mode": "id"
+        },
+        "message": "={{ $('Information Extractor').first().json.output.technical_details }}"
+      },
+      "type": "n8n-nodes-base.theHiveProject",
+      "typeVersion": 1,
+      "position": [
+        432,
+        -528
+      ],
+      "id": "7776e0f2-b4af-4bb4-bf07-84215027da41",
+      "name": "Create a comment in a case or alert",
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "dXkqVqDrBDnqcQub",
+          "name": "The Hive 5 account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "caseId": {
+          "__rl": true,
+          "value": "={{ $json._id }}",
+          "mode": "id"
+        },
+        "taskFields": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "Investigation & Response Tasks",
+            "description": "=##Investigations :\n{{ $('Information Extractor').first().json.output.recommended_investigation_steps }}\n\n##Response :\n{{ $('Information Extractor').first().json.output.recommended_response_actions }}\n"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "displayName": "Title",
+              "id": "title",
+              "type": "string",
+              "removed": false,
+              "required": true,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Description",
+              "id": "description",
+              "type": "string",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Group",
+              "id": "group",
+              "type": "string",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Status",
+              "id": "status",
+              "type": "stirng",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Flag",
+              "id": "flag",
+              "type": "boolean",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Start Date",
+              "id": "startDate",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Due Date",
+              "id": "dueDate",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "End Date",
+              "id": "endDate",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Assignee",
+              "id": "assignee",
+              "type": "options",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "options": [
+                {
+                  "name": "n8n",
+                  "value": "n8n_soar@thehive.local"
+                }
+              ]
+            },
+            {
+              "displayName": "Mandatory",
+              "id": "mandatory",
+              "type": "boolean",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Order",
+              "id": "order",
+              "type": "number",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "n8n-nodes-base.theHiveProject",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -288
+      ],
+      "id": "28cadaf6-8e7a-4221-a785-43495546d12d",
+      "name": "Create a task",
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "dXkqVqDrBDnqcQub",
+          "name": "The Hive 5 account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "observable",
+        "id": {
+          "__rl": true,
+          "value": "={{ $json._id }}",
+          "mode": "id"
+        },
+        "dataType": "other",
+        "data": "={{ $('Information Extractor').first().json.output.key_indicators }}",
+        "observableFields": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "ioc": false,
+            "sighted": false,
+            "ignoreSimilarity": false
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "displayName": "Start Date",
+              "id": "startDate",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Description",
+              "id": "message",
+              "type": "string",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Tags",
+              "id": "tags",
+              "type": "string",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "TLP (Confidentiality of information)",
+              "id": "tlp",
+              "type": "options",
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "PAP (Level of exposure of information)",
+              "id": "pap",
+              "type": "options",
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "IOC",
+              "id": "ioc",
+              "type": "boolean",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Sighted",
+              "id": "sighted",
+              "type": "boolean",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Sighted At",
+              "id": "sightedAt",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Ignore Similarity",
+              "id": "ignoreSimilarity",
+              "type": "boolean",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Is Zip",
+              "id": "isZip",
+              "type": "boolean",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Zip Password",
+              "id": "zipPassword",
+              "type": "string",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "n8n-nodes-base.theHiveProject",
+      "typeVersion": 1,
+      "position": [
+        432,
+        -128
+      ],
+      "id": "2e719f23-744c-499d-9b1c-308378681061",
+      "name": "Create an observable",
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "dXkqVqDrBDnqcQub",
+          "name": "The Hive 5 account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Virustotal",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Alienvault",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Virustotal": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alienvault": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Clean the Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean the Alert": {
+      "main": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Information Extractor": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Create a case",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a case": {
+      "main": [
+        [
+          {
+            "node": "Create a comment in a case or alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create a task",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create an observable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a task": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "565fe5ee-1d07-49cc-b4ee-77155007724a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "26fd5420e2dfb92e38c71094b30d7174ac812b3ce34c3027f7ea7242374d7d7b"
+  },
+  "id": "Hr4yJelztzrOCcw9",
+  "tags": []
+}
