@@ -35,4 +35,4 @@ Sistem ini beroperasi dalam 5 fase otomatis:
 * **Standardisasi:** Memastikan setiap tiket insiden memiliki format laporan dan taktik mitigasi yang seragam.
 
 ---
-*Didesain dan dikembangkan oleh [Nama Anda] - Open for Freelance SOC/Pentest Opportunities.*
+*Didesain dan dikembangkan oleh Reza Aditya - Open for Freelance SOC/Pentest Opportunities.*
