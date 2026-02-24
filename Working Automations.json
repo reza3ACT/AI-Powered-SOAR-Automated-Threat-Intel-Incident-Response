@@ -512,7 +512,7 @@
     },
     {
       "parameters": {
-        "chatId": "8029015272",
+        "chatId": <"used our ID">,
         "text": "=✅ <b>AUTO-CLOSED (Benign)</b> <b>AI menyimpulkan peringatan ini aman.</b> <b>Alasan:</b> {{ $('Information Extractor').first().json.output.summary }} <i>Tidak ada tiket TheHive yang dibuat.</i>",
         "additionalFields": {
           "parse_mode": "HTML"
@@ -529,7 +529,7 @@
       "webhookId": "20dc3a0d-29cc-41aa-81e3-804f2e9e43b3",
       "credentials": {
         "telegramApi": {
-          "id": "uJt6CKFG0FGFfuqW",
+          "id": <"used your id">,
           "name": "Telegram account"
         }
       }
